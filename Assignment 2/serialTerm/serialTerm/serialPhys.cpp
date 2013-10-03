@@ -41,7 +41,7 @@ HANDLE init(ioStruct *io){
 								  0, 
 								  0, 
 							      OPEN_EXISTING, 
-								  0, 
+								  FILE_FLAG_OVERLAPPED, 
 							      0);
 
 			if(hdSerial == INVALID_HANDLE_VALUE){
@@ -96,29 +96,6 @@ HANDLE init(ioStruct *io){
 
 	ReleaseDC(io->hwnd, hdc);	
 	return 0;
-}
-/*------------------------------------------------------------------------------------------------------------------
---		FUNCTION:		writeOutputBuffer
---		DATE:			September 21st, 2012
---		REVISIONS:		n/a
---		DESIGNER:		Ramzi Chennafi
---		PROGRAMMER:		Ramzi Chennafi	
---
---		INTERFACE:		writeOutputBuffer(HANDLE hdSerial, WPARAM chBuffer)					
---
---		RETURNS:		bool, true on completed write operation
---
---		NOTES:
---		Writes the character provided to a file. A port file in this case.
-----------------------------------------------------------------------------------------------------------------------*/
-bool writeOutputBuffer(HANDLE hdSerial, WPARAM chBuffer){
-	
-	DWORD			bytesWritten = 0;
-	
-	if(WriteFile(hdSerial, &chBuffer, 1, &bytesWritten, NULL)){
-		return true;
-	}
-	return false;
 }
 /*------------------------------------------------------------------------------------------------------------------
 --		FUNCTION:		endSession

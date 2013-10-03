@@ -102,7 +102,7 @@ int WINAPI WinMain (HINSTANCE hInst, HINSTANCE hprevInstance,
 LRESULT CALLBACK WndProc (HWND hwnd, UINT Message,
                           WPARAM wParam, LPARAM lParam)
 {
-	HMENU			menuHnd	= GetMenu(hwnd);
+	HMENU menuHnd = GetMenu(hwnd);
 	
 	switch (Message)
    {
@@ -147,9 +147,7 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message,
 		break;
 
 		case WM_CHAR:	
-			if(io->serialOn && wParam != VK_ESCAPE){
-				writeOutputBuffer(io->hdSerial, wParam);
-			}
+			
 		break;
 
 		case WM_KEYDOWN:
