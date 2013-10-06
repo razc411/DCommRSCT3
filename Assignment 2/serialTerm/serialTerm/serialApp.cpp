@@ -99,8 +99,7 @@ int WINAPI WinMain (HINSTANCE hInst, HINSTANCE hprevInstance,
 --		Deals with the main window thread. Requests writes, modification of data settings, usage information and 
 --		connect/disconnect buttons. Also creates a new thread to perform read operations.
 ----------------------------------------------------------------------------------------------------------------------*/
-LRESULT CALLBACK WndProc (HWND hwnd, UINT Message,
-                          WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 {
 	HMENU menuHnd = GetMenu(hwnd);
 	
@@ -139,7 +138,7 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message,
           		case IDM_DATA_SETTINGS:
             		io->cc.dwSize = sizeof(COMMCONFIG);
 					io->cc.wVersion = 0x100;
-					GetCommConfig (hComm, &io->cc, &io->cc.dwSize);
+					GetCommConfig (io->hdSerial, &io->cc, &io->cc.dwSize);
             		if (!CommConfigDialog (io->port, io->hwnd, &io->cc))
                			break;
 				break;
@@ -147,7 +146,11 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message,
 		break;
 
 		case WM_CHAR:	
-			
+			if(io->hdSerial != NULL){
+				if(!WriteFile(io->hdSerial, &wParam, 1, 0, &io->olapIO)) {
+					locProcessCommError(GetLastError (), io->hdSerial);
+				}
+			}
 		break;
 
 		case WM_KEYDOWN:
@@ -199,5 +202,6 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message,
 			break;
 		}
 	}
+
 
 

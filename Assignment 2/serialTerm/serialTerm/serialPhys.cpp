@@ -35,23 +35,41 @@
 ----------------------------------------------------------------------------------------------------------------------*/
 
 HANDLE init(ioStruct *io){
+	COMMTIMEOUTS timeouts;
+	HANDLE hdSerial = CreateFile(io->port, 
+							GENERIC_READ | GENERIC_WRITE, 
+							0, 
+							0, 
+							OPEN_EXISTING, 
+							FILE_FLAG_OVERLAPPED, 
+							0);
 
-			HANDLE hdSerial = CreateFile(io->port, 
-								  GENERIC_READ | GENERIC_WRITE, 
-								  0, 
-								  0, 
-							      OPEN_EXISTING, 
-								  FILE_FLAG_OVERLAPPED, 
-							      0);
+	if(hdSerial == INVALID_HANDLE_VALUE){
+		MessageBox (io->hwnd, TEXT("Failed to Connect"), TEXT("Dumb Terminal"), MB_OK);
+		return NULL;
+	}
+	
+	
+	io->cc.dwSize = sizeof(COMMCONFIG);
+	io->cc.wVersion = 0x100;
+	GetCommConfig (hdSerial, &io->cc, &io->cc.dwSize); 
+	if (!CommConfigDialog (io->port, io->hwnd, &io->cc)){
+		GetLastError();
+	}
 
-			if(hdSerial == INVALID_HANDLE_VALUE){
-				MessageBox (io->hwnd, TEXT("Failed to Connect"), TEXT("Dumb Terminal"), MB_OK);
-				return NULL;
-			}
+	timeouts.ReadIntervalTimeout = 20; 
+	timeouts.ReadTotalTimeoutMultiplier = 10;
+	timeouts.ReadTotalTimeoutConstant = 100;
+	timeouts.WriteTotalTimeoutMultiplier = 10;
+	timeouts.WriteTotalTimeoutConstant = 100;
 			
-			SetCommState(hdSerial, &io->cc.dcb);
-
-			return hdSerial;
+	if(!SetCommState(hdSerial, &io->cc.dcb))
+		MessageBox(io->hwnd, TEXT("Could not set comm state"), TEXT("RFID Terminal"), MB_OK | MB_ICONEXCLAMATION);
+			
+	if(!SetCommTimeouts(hdSerial, &timeouts))
+		MessageBox(io->hwnd, TEXT("Could not set timeout state"), TEXT("RFID Terminal"), MB_OK | MB_ICONEXCLAMATION);
+					
+	return hdSerial;
 	}
 /*------------------------------------------------------------------------------------------------------------------
 --		FUNCTION:		execRead
@@ -68,31 +86,50 @@ HANDLE init(ioStruct *io){
 --		New thread function called within the wndProc. Deals with the reading/formatting of recieved text and its display. Recieves an
 		ioStruct containing the serial port handle and the window HWND.
 ----------------------------------------------------------------------------------------------------------------------*/
-	DWORD WINAPI execRead(LPVOID ioS){
+DWORD WINAPI execRead(LPVOID ioS){
 		
-	WCHAR			charBuff[2] = TEXT("");
-	DWORD			bytesRead	= 0;
+	
+	WCHAR			charBuff[100];
+	COMSTAT			cs;
+	DWORD			nBytesRead	= 0, sError, sEvent, nBytesTransferred = 0;
 	static unsigned k			= 0;
 	struct ioStruct	*io			= (struct ioStruct *)ioS;
 	HDC				hdc			= GetDC(io->hwnd);
 	TEXTMETRIC		tm;
 	int				Y			= 0;
 	int				X			= 0;
+	
+	OVERLAPPED osReader = {0};
+	io->olapIO = osReader;
+	io->olapIO.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+
 	GetTextMetrics(hdc, &tm);
 
+	SetCommMask(io->hdSerial, EV_RXCHAR);
+
 	while(1){	
-		if(io->hdSerial != NULL){	
-			if(ReadFile(io->hdSerial, charBuff, 1, &bytesRead, NULL)){
-				charBuff[1] = '\0';
-				if(X >= WIN_WIDTH){
-					Y = Y + tm.tmHeight + tm.tmExternalLeading;
-					X = 0;
+		if(WaitCommEvent(io->hdSerial, &sEvent, &io->olapIO)){
+				//ClearCommError(io->hdSerial, &sError, &cs);
+				if(!GetOverlappedResult(io->hdSerial, &io->olapIO, &nBytesTransferred, FALSE)){
+					locProcessCommError(GetLastError(), io->hdSerial);
 				}
-				TextOut(hdc, X, Y, charBuff, 2); 
-				X += tm.tmMaxCharWidth;
+				else{
+					if(nBytesTransferred){	
+						ReadFile(io->hdSerial, &charBuff, nBytesTransferred, &nBytesRead, &io->olapIO);
+						if(X >= WIN_WIDTH){
+							Y = Y + tm.tmHeight + tm.tmExternalLeading;
+							X = 0;
+						}
+						TextOut(hdc, X, Y, charBuff, nBytesRead); 
+						X += tm.tmMaxCharWidth;
+					}
+				}
 			}
+		else {
+			locProcessCommError (GetLastError(), io->hdSerial);
 		}
 	}
+
 
 	ReleaseDC(io->hwnd, hdc);	
 	return 0;
@@ -119,4 +156,12 @@ void endSession(HANDLE hdSerial, HANDLE readThrd){
 		CloseHandle(hdSerial);
 		TerminateThread(readThrd, 0);
 	}
+}
+
+void locProcessCommError (DWORD dwError, HANDLE hdSerial){
+	DWORD lrc;
+	COMSTAT cs;
+
+	ClearCommError (hdSerial, &lrc, &cs);
+
 }
