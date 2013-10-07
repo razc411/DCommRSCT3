@@ -21,9 +21,15 @@
 #include <windows.h>
 #include "resource.h"
 #include <cstdio>
-HANDLE			hComm;
+
+HWND			mainHWND;
+HANDLE			readThrd;
+HANDLE			hndSerial;
+COMMCONFIG		cc;
+LPCWSTR			port		= TEXT("com1");
+OVERLAPPED		osReader	= {0,0,0,0, CreateEvent(NULL, TRUE, FALSE, NULL)};
 static TCHAR	Name[]		= TEXT("serialTerm");
-ioStruct *io = (struct ioStruct *)malloc(sizeof(ioStruct));
+bool			activePort	= false;
 
 /*------------------------------------------------------------------------------------------------------------------
 --		FUNCTION:		WinMain
@@ -68,9 +74,8 @@ int WINAPI WinMain (HINSTANCE hInst, HINSTANCE hprevInstance,
    
 	hwnd = CreateWindow (Name, Name, WS_OVERLAPPEDWINDOW, 350, 160,
    							800, 500, NULL, NULL, hInst, NULL);
-	io->serialOn = false;
-	io->port = TEXT("com1");
-	io->hwnd = hwnd;
+	
+	mainHWND = hwnd;
 	
 	ShowWindow (hwnd, nCmdShow);
 	UpdateWindow (hwnd);
@@ -102,18 +107,19 @@ int WINAPI WinMain (HINSTANCE hInst, HINSTANCE hprevInstance,
 LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 {
 	HMENU menuHnd = GetMenu(hwnd);
-	
+	DWORD threadId;
+
 	switch (Message)
    {
 		case WM_COMMAND:
 		   switch (LOWORD (wParam))
 			{
 				case IDM_CONNECT:
-					if(!io->serialOn){
-						if((io->hdSerial = init(io)) != NULL){
+					if(!activePort){
+						if((hndSerial = init(hwnd, port, cc)) != NULL){
 							MessageBox (hwnd, TEXT("Client Connected"), TEXT("Dumb Terminal"), MB_OK | MB_ICONEXCLAMATION);
-							io->serialOn = true;
-							io->readThrd = CreateThread(NULL, 0, execRead, io, 0, &io->threadId);
+							activePort = true;
+							readThrd = CreateThread(NULL, 0, execRead, hwnd, 0, &threadId);
 							EnableMenuItem(menuHnd, IDM_CONNECT, MF_GRAYED);
 							DrawMenuBar(hwnd);
 						}
@@ -126,43 +132,40 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 				break;
 				
 				case ID_PORT_COMM1:
-					io->port = TEXT("com1");
+					port = TEXT("com1");
 					checkItem(menuHnd, COMM1);
 				break;
 				
 				case ID_PORT_COMM3:
-					io->port = TEXT("com3");
+					port = TEXT("com3");
 					checkItem(menuHnd, COMM3);
 				break;
 
           		case IDM_DATA_SETTINGS:
-            		io->cc.dwSize = sizeof(COMMCONFIG);
-					io->cc.wVersion = 0x100;
-					GetCommConfig (io->hdSerial, &io->cc, &io->cc.dwSize);
-            		if (!CommConfigDialog (io->port, io->hwnd, &io->cc))
+            		cc.dwSize = sizeof(COMMCONFIG);
+					cc.wVersion = 0x100;
+					GetCommConfig (hndSerial, &cc, &cc.dwSize);
+            		if (!CommConfigDialog (port, hwnd, &cc))
                			break;
 				break;
 			}
 		break;
 
 		case WM_CHAR:	
-			if(io->hdSerial != NULL){
-				if(!WriteFile(io->hdSerial, &wParam, 1, 0, &io->olapIO)) {
-					locProcessCommError(GetLastError (), io->hdSerial);
+			if(hndSerial != NULL){
+				if(!WriteFile(hndSerial, &wParam, 1, 0, &osReader)) {
+					locProcessCommError(GetLastError (), hndSerial);
 				}
 			}
 		break;
 
 		case WM_KEYDOWN:
-			if(wParam == VK_ESCAPE && io->serialOn == true){
-				io->serialOn = false;
-				
+			if(wParam == VK_ESCAPE && activePort == true){
+				activePort = false;
 				MessageBox (hwnd, TEXT("Client Disconnected"), TEXT("Dumb Terminal"), MB_OK | MB_ICONEXCLAMATION);
 				InvalidateRect(hwnd, NULL, FALSE);
 				EnableMenuItem(menuHnd, IDM_CONNECT, MF_ENABLED);
 				DrawMenuBar(hwnd);
-				
-				endSession(io->hdSerial, io->readThrd);
 			}
 		break;
 
@@ -190,18 +193,74 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 --		Check marks the currently used port in the ports menu of the main window. hnd is the menu handle of the item, 
 --		while port specifies which item to check. Options are COMM1 and COMM3.
 ----------------------------------------------------------------------------------------------------------------------*/
-	void checkItem(HMENU hnd, UINT port){
-		switch(port){
-			case COMM1 : 
-				CheckMenuItem(hnd, ID_PORT_COMM1, MF_CHECKED);
-				CheckMenuItem(hnd, ID_PORT_COMM3, MF_UNCHECKED);
-			break;
-			case COMM3: 
-				CheckMenuItem(hnd, ID_PORT_COMM3, MF_CHECKED);
-				CheckMenuItem(hnd, ID_PORT_COMM1, MF_UNCHECKED);
-			break;
-		}
+void checkItem(HMENU hnd, UINT port){
+	switch(port){
+		case COMM1 : 
+			CheckMenuItem(hnd, ID_PORT_COMM1, MF_CHECKED);
+			CheckMenuItem(hnd, ID_PORT_COMM3, MF_UNCHECKED);
+		break;
+		case COMM3: 
+			CheckMenuItem(hnd, ID_PORT_COMM3, MF_CHECKED);
+			CheckMenuItem(hnd, ID_PORT_COMM1, MF_UNCHECKED);
+		break;
+	}
+}
+
+/*------------------------------------------------------------------------------------------------------------------
+--		FUNCTION:		checkItem
+--		DATE:			September 21st, 2012
+--		REVISIONS:		n/a
+--		DESIGNER:		Ramzi Chennafi
+--		PROGRAMMER:		Ramzi Chennafi	
+--
+--		INTERFACE:		void checkItem(HMENU hnd, UINT port)				
+--
+--		RETURNS:		Nothing
+--
+--		NOTES:
+--		Check marks the currently used port in the ports menu of the main window. hnd is the menu handle of the item, 
+--		while port specifies which item to check. Options are COMM1 and COMM3.
+----------------------------------------------------------------------------------------------------------------------*/
+DWORD WINAPI execRead(LPVOID hwnd){
+
+	while(activePort){
+		readPort(hndSerial, &osReader);  
 	}
 
+	endSession(hndSerial, readThrd);
 
+	return 0;
+}
 
+/*------------------------------------------------------------------------------------------------------------------
+--		FUNCTION:		checkItem
+--		DATE:			September 21st, 2012
+--		REVISIONS:		n/a
+--		DESIGNER:		Ramzi Chennafi
+--		PROGRAMMER:		Ramzi Chennafi	
+--
+--		INTERFACE:		void checkItem(HMENU hnd, UINT port)				
+--
+--		RETURNS:		Nothing
+--
+--		NOTES:
+--		Check marks the currently used port in the ports menu of the main window. hnd is the menu handle of the item, 
+--		while port specifies which item to check. Options are COMM1 and COMM3.
+----------------------------------------------------------------------------------------------------------------------*/
+DWORD paintFile(WCHAR* charBuff, DWORD nBytesRead){
+	
+	HDC hdc = GetDC(mainHWND);
+	int X = 0;
+	int Y = 0;
+	TEXTMETRIC tm;
+	GetTextMetrics(hdc, &tm);
+
+	if(X >= WIN_WIDTH){
+		Y = Y + tm.tmHeight + tm.tmExternalLeading;
+		X = 0;
+	}
+	TextOut(hdc, X, Y, charBuff, nBytesRead); 
+	X += tm.tmMaxCharWidth;
+
+	return 0;
+}

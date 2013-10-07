@@ -34,9 +34,9 @@
 --		Opens the selected serial port in synchronous i/o mode. 
 ----------------------------------------------------------------------------------------------------------------------*/
 
-HANDLE init(ioStruct *io){
+HANDLE init(HWND hwnd, LPCWSTR port, COMMCONFIG cc){
 	COMMTIMEOUTS timeouts;
-	HANDLE hdSerial = CreateFile(io->port, 
+	HANDLE hdSerial = CreateFile(port, 
 							GENERIC_READ | GENERIC_WRITE, 
 							0, 
 							0, 
@@ -45,29 +45,30 @@ HANDLE init(ioStruct *io){
 							0);
 
 	if(hdSerial == INVALID_HANDLE_VALUE){
-		MessageBox (io->hwnd, TEXT("Failed to Connect"), TEXT("Dumb Terminal"), MB_OK);
+		MessageBox (hwnd, TEXT("Failed to Connect"), TEXT("Dumb Terminal"), MB_OK);
 		return NULL;
 	}
 	
 	
-	io->cc.dwSize = sizeof(COMMCONFIG);
-	io->cc.wVersion = 0x100;
-	GetCommConfig (hdSerial, &io->cc, &io->cc.dwSize); 
-	if (!CommConfigDialog (io->port, io->hwnd, &io->cc)){
+	cc.dwSize = sizeof(COMMCONFIG);
+	cc.wVersion = 0x100;
+	GetCommConfig (hdSerial, &cc, &cc.dwSize); 
+	if (!CommConfigDialog (port, hwnd, &cc)){
 		GetLastError();
 	}
 
-	timeouts.ReadIntervalTimeout = 20; 
-	timeouts.ReadTotalTimeoutMultiplier = 10;
-	timeouts.ReadTotalTimeoutConstant = 100;
-	timeouts.WriteTotalTimeoutMultiplier = 10;
-	timeouts.WriteTotalTimeoutConstant = 100;
+	timeouts.ReadIntervalTimeout        = MAXDWORD; 
+	timeouts.ReadTotalTimeoutMultiplier    = 0;
+	timeouts.ReadTotalTimeoutConstant    = 0;
+	timeouts.WriteTotalTimeoutMultiplier    = 0;
+	timeouts.WriteTotalTimeoutConstant    = 0;
+
 			
-	if(!SetCommState(hdSerial, &io->cc.dcb))
-		MessageBox(io->hwnd, TEXT("Could not set comm state"), TEXT("RFID Terminal"), MB_OK | MB_ICONEXCLAMATION);
+	if(!SetCommState(hdSerial, &cc.dcb))
+		MessageBox(hwnd, TEXT("Could not set comm state"), TEXT("RFID Terminal"), MB_OK | MB_ICONEXCLAMATION);
 			
 	if(!SetCommTimeouts(hdSerial, &timeouts))
-		MessageBox(io->hwnd, TEXT("Could not set timeout state"), TEXT("RFID Terminal"), MB_OK | MB_ICONEXCLAMATION);
+		MessageBox(hwnd, TEXT("Could not set timeout state"), TEXT("RFID Terminal"), MB_OK | MB_ICONEXCLAMATION);
 					
 	return hdSerial;
 	}
@@ -86,53 +87,29 @@ HANDLE init(ioStruct *io){
 --		New thread function called within the wndProc. Deals with the reading/formatting of recieved text and its display. Recieves an
 		ioStruct containing the serial port handle and the window HWND.
 ----------------------------------------------------------------------------------------------------------------------*/
-DWORD WINAPI execRead(LPVOID ioS){
+void readPort(HANDLE hndSerial, LPOVERLAPPED osReader){
 		
 	
 	WCHAR			charBuff[100];
-	COMSTAT			cs;
-	DWORD			nBytesRead	= 0, sError, sEvent, nBytesTransferred = 0;
-	static unsigned k			= 0;
-	struct ioStruct	*io			= (struct ioStruct *)ioS;
-	HDC				hdc			= GetDC(io->hwnd);
-	TEXTMETRIC		tm;
-	int				Y			= 0;
-	int				X			= 0;
-	
-	OVERLAPPED osReader = {0};
-	io->olapIO = osReader;
-	io->olapIO.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	DWORD			nBytesRead	= 0; 
+	DWORD			sEvent;
+	DWORD			nBytesTransferred = 0;
 
-	GetTextMetrics(hdc, &tm);
 
-	SetCommMask(io->hdSerial, EV_RXCHAR);
+	SetCommMask(hndSerial, EV_RXCHAR);
 
-	while(1){	
-		if(WaitCommEvent(io->hdSerial, &sEvent, &io->olapIO)){
-				//ClearCommError(io->hdSerial, &sError, &cs);
-				if(!GetOverlappedResult(io->hdSerial, &io->olapIO, &nBytesTransferred, FALSE)){
-					locProcessCommError(GetLastError(), io->hdSerial);
-				}
-				else{
-					if(nBytesTransferred){	
-						ReadFile(io->hdSerial, &charBuff, nBytesTransferred, &nBytesRead, &io->olapIO);
-						if(X >= WIN_WIDTH){
-							Y = Y + tm.tmHeight + tm.tmExternalLeading;
-							X = 0;
-						}
-						TextOut(hdc, X, Y, charBuff, nBytesRead); 
-						X += tm.tmMaxCharWidth;
-					}
-				}
-			}
-		else {
-			locProcessCommError (GetLastError(), io->hdSerial);
-		}
+	if(WaitCommEvent(hndSerial, &sEvent, osReader)){
+		
+			GetOverlappedResult(hndSerial, osReader, &nBytesTransferred, FALSE);
+			//ClearCommError(io->hdSerial, &sError, &cs);
+			ReadFile(hndSerial, &charBuff, nBytesTransferred, &nBytesRead, osReader);
+			paintFile(charBuff, nBytesRead);	
+		
 	}
 
-
-	ReleaseDC(io->hwnd, hdc);	
-	return 0;
+	ResetEvent(osReader->hEvent);
+	
+	
 }
 /*------------------------------------------------------------------------------------------------------------------
 --		FUNCTION:		endSession
