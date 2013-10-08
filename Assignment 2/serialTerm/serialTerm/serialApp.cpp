@@ -18,9 +18,7 @@
 --		and the settings that go with said serial connection. Prints any data recieved to the window and sends any keyboard input
 --		through the serial line after the Connect menu item is pressed. 
 ----------------------------------------------------------------------------------------------------------------------*/
-#include <windows.h>
 #include "resource.h"
-
 
 HWND			mainHWND;
 HANDLE			readThrd;
