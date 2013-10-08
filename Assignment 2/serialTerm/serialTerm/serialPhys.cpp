@@ -16,8 +16,9 @@
 		read and write to that serial port. A new thread is created for the read portion of this layer. Also preforms
 		buffer flushing and session termination.
 ----------------------------------------------------------------------------------------------------------------------*/
-#include <Windows.h>
-#include "resource.h"
+
+
+
 /*----------------------------------------------------------------------------------------------------------------------
 --		FUNCTION:		init
 --		DATE:			September 21st, 2012
@@ -33,45 +34,60 @@
 --		NOTES:
 --		Opens the selected serial port in synchronous i/o mode. 
 ----------------------------------------------------------------------------------------------------------------------*/
-
-HANDLE init(HWND hwnd, LPCWSTR port, COMMCONFIG cc){
-	COMMTIMEOUTS timeouts;
-	HANDLE hdSerial = CreateFile(port, 
-							GENERIC_READ | GENERIC_WRITE, 
-							0, 
-							0, 
-							OPEN_EXISTING, 
-							FILE_FLAG_OVERLAPPED, 
-							0);
-
-	if(hdSerial == INVALID_HANDLE_VALUE){
-		MessageBox (hwnd, TEXT("Failed to Connect"), TEXT("Dumb Terminal"), MB_OK);
-		return NULL;
-	}
-	
-	
-	cc.dwSize = sizeof(COMMCONFIG);
-	cc.wVersion = 0x100;
-	GetCommConfig (hdSerial, &cc, &cc.dwSize); 
-	if (!CommConfigDialog (port, hwnd, &cc)){
-		GetLastError();
-	}
-
-	timeouts.ReadIntervalTimeout        = MAXDWORD; 
-	timeouts.ReadTotalTimeoutMultiplier    = 0;
-	timeouts.ReadTotalTimeoutConstant    = 0;
-	timeouts.WriteTotalTimeoutMultiplier    = 0;
-	timeouts.WriteTotalTimeoutConstant    = 0;
-
-			
-	if(!SetCommState(hdSerial, &cc.dcb))
-		MessageBox(hwnd, TEXT("Could not set comm state"), TEXT("RFID Terminal"), MB_OK | MB_ICONEXCLAMATION);
-			
-	if(!SetCommTimeouts(hdSerial, &timeouts))
-		MessageBox(hwnd, TEXT("Could not set timeout state"), TEXT("RFID Terminal"), MB_OK | MB_ICONEXCLAMATION);
-					
-	return hdSerial;
-	}
+//
+//DWORD init(HWND hwnd, LPCWSTR port, COMMCONFIG cc, LPSKYETEK_DEVICE device){
+//	COMMTIMEOUTS timeouts;
+//
+//	device->readFD = CreateFile(device->address,
+//					GENERIC_READ,
+//					FILE_SHARE_WRITE,
+//					NULL,
+//					OPEN_EXISTING,
+//					FILE_FLAG_OVERLAPPED,
+//					NULL);
+//
+//	if( device->readFD == INVALID_HANDLE_VALUE )
+//	{
+//
+//	}
+//
+//	device->writeFD = CreateFile(device->address,
+//					GENERIC_WRITE,
+//					FILE_SHARE_READ,
+//					NULL,
+//					OPEN_EXISTING,
+//					FILE_FLAG_OVERLAPPED,
+//					NULL);
+//
+//	if( device->writeFD == INVALID_HANDLE_VALUE )
+//	{
+//		CloseHandle(device->readFD);
+//		device->readFD = device->writeFD = 0;
+//	}
+//	
+//	
+//	cc.dwSize = sizeof(COMMCONFIG);
+//	cc.wVersion = 0x100;
+//	GetCommConfig (device->writeFD, &cc, &cc.dwSize); 
+//	if (!CommConfigDialog (port, hwnd, &cc)){
+//		GetLastError();
+//	}
+//
+//	timeouts.ReadIntervalTimeout        = MAXDWORD; 
+//	timeouts.ReadTotalTimeoutMultiplier    = 0;
+//	timeouts.ReadTotalTimeoutConstant    = 0;
+//	timeouts.WriteTotalTimeoutMultiplier    = 0;
+//	timeouts.WriteTotalTimeoutConstant    = 0;
+//
+//			
+//	if(!SetCommState(device->writeFD, &cc.dcb))
+//		MessageBox(hwnd, TEXT("Could not set comm state"), TEXT("RFID Terminal"), MB_OK | MB_ICONEXCLAMATION);
+//			
+//	if(!SetCommTimeouts(device->writeFD, &timeouts))
+//		MessageBox(hwnd, TEXT("Could not set timeout state"), TEXT("RFID Terminal"), MB_OK | MB_ICONEXCLAMATION);
+//					
+//	return 1;
+//	}
 /*------------------------------------------------------------------------------------------------------------------
 --		FUNCTION:		execRead
 --		DATE:			September 21st, 2012
@@ -87,58 +103,3 @@ HANDLE init(HWND hwnd, LPCWSTR port, COMMCONFIG cc){
 --		New thread function called within the wndProc. Deals with the reading/formatting of recieved text and its display. Recieves an
 		ioStruct containing the serial port handle and the window HWND.
 ----------------------------------------------------------------------------------------------------------------------*/
-void readPort(HANDLE hndSerial, LPOVERLAPPED osReader){
-		
-	
-	WCHAR			charBuff[100];
-	DWORD			nBytesRead	= 0; 
-	DWORD			sEvent;
-	DWORD			nBytesTransferred = 0;
-
-
-	SetCommMask(hndSerial, EV_RXCHAR);
-
-	if(WaitCommEvent(hndSerial, &sEvent, osReader)){
-		
-			GetOverlappedResult(hndSerial, osReader, &nBytesTransferred, FALSE);
-			//ClearCommError(io->hdSerial, &sError, &cs);
-			ReadFile(hndSerial, &charBuff, nBytesTransferred, &nBytesRead, osReader);
-			paintFile(charBuff, nBytesRead);	
-		
-	}
-
-	ResetEvent(osReader->hEvent);
-	
-	
-}
-/*------------------------------------------------------------------------------------------------------------------
---		FUNCTION:		endSession
---		DATE:			September 21st, 2012
---		REVISIONS:		n/a
---		DESIGNER:		Ramzi Chennafi
---		PROGRAMMER:		Ramzi Chennafi	
---
---		INTERFACE:		endSession(HANDLE hdSerial, HANDLE readThrd)					
---
---		RETURNS:		Nothing
---
---		NOTES:
---		Flushes the I/O buffer, closes the serial port and terminates the read thread. Will not do so unless
-		handles have been intiated.
-----------------------------------------------------------------------------------------------------------------------*/
-void endSession(HANDLE hdSerial, HANDLE readThrd){
-	
-	if(hdSerial != NULL && readThrd != NULL){
-		CancelSynchronousIo(readThrd);
-		CloseHandle(hdSerial);
-		TerminateThread(readThrd, 0);
-	}
-}
-
-void locProcessCommError (DWORD dwError, HANDLE hdSerial){
-	DWORD lrc;
-	COMSTAT cs;
-
-	ClearCommError (hdSerial, &lrc, &cs);
-
-}

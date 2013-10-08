@@ -20,7 +20,7 @@
 ----------------------------------------------------------------------------------------------------------------------*/
 #include <windows.h>
 #include "resource.h"
-#include <cstdio>
+
 
 HWND			mainHWND;
 HANDLE			readThrd;
@@ -30,6 +30,8 @@ LPCWSTR			port		= TEXT("com1");
 OVERLAPPED		osReader	= {0,0,0,0, CreateEvent(NULL, TRUE, FALSE, NULL)};
 static TCHAR	Name[]		= TEXT("serialTerm");
 bool			activePort	= false;
+LPSKYETEK_DEVICE device;
+LPSKYETEK_DEVICE usbDevice;
 
 /*------------------------------------------------------------------------------------------------------------------
 --		FUNCTION:		WinMain
@@ -108,6 +110,10 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 {
 	HMENU menuHnd = GetMenu(hwnd);
 	DWORD threadId;
+	LPSKYETEK_DEVICE **devices;
+	LPSKYETEK_READER **readers;
+	int flag = 0;
+	HDC hdc = GetDC(hwnd);
 
 	switch (Message)
    {
@@ -116,14 +122,9 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 			{
 				case IDM_CONNECT:
 					if(!activePort){
-						if((hndSerial = init(hwnd, port, cc)) != NULL){
-							MessageBox (hwnd, TEXT("Client Connected"), TEXT("Dumb Terminal"), MB_OK | MB_ICONEXCLAMATION);
-							activePort = true;
-							readThrd = CreateThread(NULL, 0, execRead, hwnd, 0, &threadId);
-							EnableMenuItem(menuHnd, IDM_CONNECT, MF_GRAYED);
-							DrawMenuBar(hwnd);
-						}
-					}
+						SkyeTek_DiscoverDevices(devices);
+						SkyeTek_DiscoverReaders(devices[0], 1, readers);
+						readThrd = CreateThread(NULL, 0, execRead, readers, 0, &threadId);
 				break;
 
 				case IDM_HELP:
@@ -152,11 +153,7 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 		break;
 
 		case WM_CHAR:	
-			if(hndSerial != NULL){
-				if(!WriteFile(hndSerial, &wParam, 1, 0, &osReader)) {
-					locProcessCommError(GetLastError (), hndSerial);
-				}
-			}
+			
 		break;
 
 		case WM_KEYDOWN:
@@ -221,10 +218,14 @@ void checkItem(HMENU hnd, UINT port){
 --		Check marks the currently used port in the ports menu of the main window. hnd is the menu handle of the item, 
 --		while port specifies which item to check. Options are COMM1 and COMM3.
 ----------------------------------------------------------------------------------------------------------------------*/
-DWORD WINAPI execRead(LPVOID hwnd){
+DWORD WINAPI execRead(LPVOID reader){
+
+	LPSKYETEK_DATA lpData = NULL;
+	LPSKYETEK_TAG lpTag = NULL;
+	int flag = 0;
 
 	while(activePort){
-		readPort(hndSerial, &osReader);  
+		status = SkyeTek_ReadTagData(readers[0],lpTag,&addr,flag,flag,&lpData);
 	}
 
 	endSession(hndSerial, readThrd);
