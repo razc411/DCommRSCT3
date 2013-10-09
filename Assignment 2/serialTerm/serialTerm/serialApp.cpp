@@ -31,6 +31,7 @@ bool			activePort	= false;
 LPSKYETEK_DEVICE device;
 LPSKYETEK_DEVICE usbDevice;
 
+
 /*------------------------------------------------------------------------------------------------------------------
 --		FUNCTION:		WinMain
 --		DATE:			September 21st, 2012
@@ -108,10 +109,14 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 {
 	HMENU menuHnd = GetMenu(hwnd);
 	DWORD threadId;
-	LPSKYETEK_DEVICE **devices = NULL;
-	LPSKYETEK_READER **readers = NULL;
+	LPSKYETEK_DEVICE device = NULL;
+	LPSKYETEK_READER reader = NULL;
+	int numReaders = 0;
+	int numDevices = 0;
+	int devicestatus = 0;
 	int flag = 0;
 	HDC hdc = GetDC(hwnd);
+	TCHAR* lpszcommname = TEXT("com4");
 
 	switch (Message)
    {
@@ -120,10 +125,15 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 			{
 				case IDM_CONNECT:
 					if(!activePort){
-						SkyeTek_DiscoverDevices(devices);
-						SkyeTek_DiscoverReaders(devices[0], 1, readers);
-						readThrd = CreateThread(NULL, 0, execRead, &readers[0], 0, &threadId);
-					}
+								devicestatus = SkyeTek_CreateDevice(lpszcommname, &device);
+
+								numReaders = SkyeTek_CreateReader(device, &reader);
+								MessageBox(hwnd, TEXT("Found"), TEXT("Reader"), MB_OK);
+								readThrd = CreateThread(NULL, 0, execRead, &reader[0], 0, &threadId);
+							
+						}
+						
+					
 				break;
 
 				case IDM_HELP:
@@ -149,6 +159,7 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
                			break;
 				break;
 			}
+
 		break;
 
 		case WM_CHAR:	

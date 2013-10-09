@@ -27,7 +27,7 @@
 
 #else
 
-#include <unistd.h>
+//nclude <unistd.h>
 #include <stdint.h>
 
 #define SKYETEK_DEVICE_FILE int
@@ -76,7 +76,7 @@ typedef short INT16;
 
 #else
 
-#include <inttypes.h>
+//#include <inttypes.h>
 
 #ifndef UINT32
 typedef uint32_t UINT32;
