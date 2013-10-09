@@ -30,6 +30,8 @@ static TCHAR	Name[]		= TEXT("serialTerm");
 bool			activePort	= false;
 LPSKYETEK_DEVICE device;
 LPSKYETEK_DEVICE usbDevice;
+LPSKYETEK_DEVICE *devices = NULL;
+LPSKYETEK_READER *readers = NULL;
 
 
 /*------------------------------------------------------------------------------------------------------------------
@@ -109,8 +111,6 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 {
 	HMENU menuHnd = GetMenu(hwnd);
 	DWORD threadId;
-	LPSKYETEK_DEVICE *devices = NULL;
-	LPSKYETEK_READER *readers = NULL;
 	int numReaders = 0;
 	int numDevices = 0;
 	int devicestatus = 0;
@@ -129,16 +129,13 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 						{
 							if((numReaders = SkyeTek_DiscoverReaders(devices,numDevices,&readers)) > 0 )
 							{
+								activePort = true;
 								MessageBox(hwnd, TEXT("Found"), TEXT("Reader"), MB_OK);
 								readThrd = CreateThread(NULL, 0, execRead, readers[0], 0, &threadId);
 							}
 						}			
 					}
-								
-							
-						
-						
-					
+
 				break;
 
 				case IDM_HELP:
@@ -237,21 +234,30 @@ DWORD WINAPI execRead(LPVOID reader){
 
 	LPSKYETEK_DATA lpData = NULL;
 	LPSKYETEK_TAG lpTag = NULL;
+	LPSKYETEK_READER lpReader = (LPSKYETEK_READER)reader;
+	SKYETEK_TAGTYPE tagType = AUTO_DETECT;
+	unsigned short tagCount;
+	SKYETEK_STATUS st;
 	int flag = 0;
 	HDC hdc = GetDC(mainHWND);
+	
 	SKYETEK_STATUS status;
 	LPSKYETEK_STRING str;
 	SKYETEK_ADDRESS addr;
 
-	addr.start = 0x1002;
+	addr.start = 0x5002;
 	addr.blocks = 6;
 
-	while(activePort){
-		status = SkyeTek_ReadTagData((LPSKYETEK_READER)reader,lpTag,&addr,flag,flag,&lpData);
-		str = SkyeTek_GetStringFromID(lpTag->id);
-		TextOut(hdc, 0, 0, str, lpTag->id->length);
-	}
+	SkyeTek_CreateTag(ISO_18000_6C_AUTO_DETECT, NULL, &lpTag);
 
+	while(activePort){
+		status = SkyeTek_ReadTagData(lpReader,lpTag,&addr,flag,flag,&lpData);
+		if(status == SKYETEK_SUCCESS)
+		{
+			str = SkyeTek_GetStringFromData(lpData);
+			paintFile(str, lpData->size);
+		}
+	}
 	return 0;
 }
 
@@ -270,7 +276,7 @@ DWORD WINAPI execRead(LPVOID reader){
 --		Check marks the currently used port in the ports menu of the main window. hnd is the menu handle of the item, 
 --		while port specifies which item to check. Options are COMM1 and COMM3.
 ----------------------------------------------------------------------------------------------------------------------*/
-DWORD paintFile(WCHAR* charBuff, DWORD nBytesRead){
+DWORD paintFile(TCHAR* charBuff, DWORD nBytesRead){
 	
 	HDC hdc = GetDC(mainHWND);
 	int X = 0;
