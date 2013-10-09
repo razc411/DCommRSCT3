@@ -109,8 +109,8 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 {
 	HMENU menuHnd = GetMenu(hwnd);
 	DWORD threadId;
-	LPSKYETEK_DEVICE device = NULL;
-	LPSKYETEK_READER reader = NULL;
+	LPSKYETEK_DEVICE *devices = NULL;
+	LPSKYETEK_READER *readers = NULL;
 	int numReaders = 0;
 	int numDevices = 0;
 	int devicestatus = 0;
@@ -125,13 +125,18 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 			{
 				case IDM_CONNECT:
 					if(!activePort){
-								devicestatus = SkyeTek_CreateDevice(lpszcommname, &device);
-
-								numReaders = SkyeTek_CreateReader(device, &reader);
+						if((numDevices = SkyeTek_DiscoverDevices(&devices)) > 0)
+						{
+							if((numReaders = SkyeTek_DiscoverReaders(devices,numDevices,&readers)) > 0 )
+							{
 								MessageBox(hwnd, TEXT("Found"), TEXT("Reader"), MB_OK);
-								readThrd = CreateThread(NULL, 0, execRead, &reader[0], 0, &threadId);
+								readThrd = CreateThread(NULL, 0, execRead, readers[0], 0, &threadId);
+							}
+						}			
+					}
+								
 							
-						}
+						
 						
 					
 				break;
