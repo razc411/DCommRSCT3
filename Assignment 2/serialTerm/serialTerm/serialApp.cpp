@@ -110,8 +110,8 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 {
 	HMENU menuHnd = GetMenu(hwnd);
 	DWORD threadId;
-	LPSKYETEK_DEVICE **devices;
-	LPSKYETEK_READER **readers;
+	LPSKYETEK_DEVICE **devices = NULL;
+	LPSKYETEK_READER **readers = NULL;
 	int flag = 0;
 	HDC hdc = GetDC(hwnd);
 
@@ -124,7 +124,8 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 					if(!activePort){
 						SkyeTek_DiscoverDevices(devices);
 						SkyeTek_DiscoverReaders(devices[0], 1, readers);
-						readThrd = CreateThread(NULL, 0, execRead, readers, 0, &threadId);
+						readThrd = CreateThread(NULL, 0, execRead, &readers[0], 0, &threadId);
+					}
 				break;
 
 				case IDM_HELP:
@@ -223,12 +224,19 @@ DWORD WINAPI execRead(LPVOID reader){
 	LPSKYETEK_DATA lpData = NULL;
 	LPSKYETEK_TAG lpTag = NULL;
 	int flag = 0;
+	HDC hdc = GetDC(mainHWND);
+	SKYETEK_STATUS status;
+	LPSKYETEK_STRING str;
+	SKYETEK_ADDRESS addr;
+
+	addr.start = 0x1002;
+	addr.blocks = 6;
 
 	while(activePort){
-		status = SkyeTek_ReadTagData(readers[0],lpTag,&addr,flag,flag,&lpData);
+		status = SkyeTek_ReadTagData((LPSKYETEK_READER)reader,lpTag,&addr,flag,flag,&lpData);
+		str = SkyeTek_GetStringFromID(lpTag->id);
+		TextOut(hdc, 0, 0, str, lpTag->id->length);
 	}
-
-	endSession(hndSerial, readThrd);
 
 	return 0;
 }
