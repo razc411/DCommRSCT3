@@ -236,10 +236,15 @@ DWORD WINAPI execRead(LPVOID reader){
 	LPSKYETEK_TAG lpTag = NULL;
 	LPSKYETEK_READER lpReader = (LPSKYETEK_READER)reader;
 	SKYETEK_TAGTYPE tagType = AUTO_DETECT;
+	OVERLAPPED overlap = {0};
 	unsigned short tagCount;
 	SKYETEK_STATUS st;
 	int flag = 0;
-	HDC hdc = GetDC(mainHWND);
+	DWORD evntMask;
+	
+	overlap.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+	SetCommMask(lpReader->lpDevice->readFD, EV_RXCHAR);
 	
 	SKYETEK_STATUS status;
 	LPSKYETEK_STRING str;
@@ -249,15 +254,15 @@ DWORD WINAPI execRead(LPVOID reader){
 	addr.blocks = 6;
 
 	SkyeTek_CreateTag(ISO_18000_6C_AUTO_DETECT, NULL, &lpTag);
-
-	while(activePort){
-		status = SkyeTek_ReadTagData(lpReader,lpTag,&addr,flag,flag,&lpData);
-		if(status == SKYETEK_SUCCESS)
-		{
-			str = SkyeTek_GetStringFromData(lpData);
-			paintFile(str, lpData->size);
+		while(activePort){
+			status = SkyeTek_ReadTagData(lpReader,lpTag,&addr,flag,flag,&lpData);
+			if(status == SKYETEK_SUCCESS)
+			{
+				str = SkyeTek_GetStringFromData(lpData);
+				paintFile(str, lpData->size);
+			}
+			
 		}
-	}
 	return 0;
 }
 
@@ -276,20 +281,11 @@ DWORD WINAPI execRead(LPVOID reader){
 --		Check marks the currently used port in the ports menu of the main window. hnd is the menu handle of the item, 
 --		while port specifies which item to check. Options are COMM1 and COMM3.
 ----------------------------------------------------------------------------------------------------------------------*/
-DWORD paintFile(TCHAR* charBuff, DWORD nBytesRead){
+DWORD paintFile(TCHAR* charBuff, DWORD nCharsRead){
 	
 	HDC hdc = GetDC(mainHWND);
-	int X = 0;
-	int Y = 0;
-	TEXTMETRIC tm;
-	GetTextMetrics(hdc, &tm);
-
-	if(X >= WIN_WIDTH){
-		Y = Y + tm.tmHeight + tm.tmExternalLeading;
-		X = 0;
-	}
-	TextOut(hdc, X, Y, charBuff, nBytesRead); 
-	X += tm.tmMaxCharWidth;
-
+	
+	TextOut(hdc, 0, 0, charBuff, nCharsRead); 
+	
 	return 0;
 }
