@@ -18,13 +18,13 @@
 
 HWND				mainHWND;
 HANDLE				readThrd;
-HANDLE				hndSerial;
-COMMCONFIG			cc;
 static TCHAR		Name[]		= TEXT("SkyeTek Reader");
 bool				activePort	= false;
 LPSKYETEK_DEVICE	*devices	= NULL;
 LPSKYETEK_READER	*readers	= NULL;
 int					yPos		= 0;
+int					numDevices  = 0;
+int					numReaders  = 0;
 
 
 /*------------------------------------------------------------------------------------------------------------------
@@ -51,7 +51,7 @@ int WINAPI WinMain (HINSTANCE hInst, HINSTANCE hprevInstance,
 	WNDCLASSEX	Wcl;
 	
 	Wcl.cbSize = sizeof (WNDCLASSEX);
-	Wcl.style = CS_HREDRAW | CS_VREDRAW;
+	Wcl.style = 0;
 	Wcl.hIcon = LoadIcon(NULL, IDI_APPLICATION); 
 	Wcl.hIconSm = NULL; 
 	Wcl.hCursor = LoadCursor(NULL, IDC_ARROW);  
@@ -97,17 +97,13 @@ int WINAPI WinMain (HINSTANCE hInst, HINSTANCE hprevInstance,
 --		RETURNS:		LRESULT to the system.
 --
 --		NOTES:
---		Deals with the main window thread. Intiates a connection to the RFID on Connect. Also performs the disconnect 
+--		Deals with the main window thread. Intiates a connection to the RFID on Connect. Also intiates the disconnect 
 --		and provides a help dialogue.
 ----------------------------------------------------------------------------------------------------------------------*/
 LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 {
-	DWORD	threadId;
+	HMENU	menuHnd	 = GetMenu(hwnd);
 	HDC		hdc;
-	HMENU	menuHnd	   = GetMenu(hwnd);
-	int		numReaders = 0;
-	int		numDevices = 0;
-	int		flag	   = 0;
 
 	switch (Message)
    {
@@ -115,34 +111,9 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 		   switch (LOWORD (wParam))
 			{
 				case IDM_CONNECT:
-					hdc = GetDC(hwnd);
-					TextOut(hdc, 0, yPos, TEXT("Discovering Devices..."), 21);
-					yPos += 20;
-					if(!activePort){
-						if((numDevices = SkyeTek_DiscoverDevices(&devices)) > 0)
-						{
-							if((numReaders = SkyeTek_DiscoverReaders(devices,numDevices,&readers)) > 0 )
-							{
-								TextOut(hdc, 0, yPos, TEXT("Discovered Reader"), 17);
-								yPos +=20;
-								activePort = true;
-								EnableMenuItem(menuHnd, IDM_CONNECT, MF_DISABLED);
-								EnableMenuItem(menuHnd, IDM_DISCONNECT, MF_ENABLED);
-								DrawMenuBar(hwnd);
-								readThrd = CreateThread(NULL, 0, execRead, readers[0], 0, &threadId);
-
-							}
-							else{
-								TextOut(hdc, 0, yPos, TEXT("Failed to Discover Reader"), 25);
-								yPos += 20;
-							}
-						}
-						else {
-							TextOut(hdc, 0, yPos, TEXT("Failed to Discover Devices"), 26);
-							yPos += 20;
-						}
-					}
-					ReleaseDC(hwnd, hdc);
+					numReaders = 0;
+					numDevices = 0;
+					openConnection(hwnd, menuHnd);
 				break;
 					
 				case IDM_DISCONNECT:
@@ -174,6 +145,68 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 /*------------------------------------------------------------------------------------------------------------------
+--		FUNCTION:		increaseY
+--		DATE:			October 10, 2013
+--		REVISIONS:		n/a
+--		DESIGNER:		Ramzi Chennafi and Ian Davidson
+--		PROGRAMMER:		Ramzi Chennafi and Ian Davidson
+--
+--		INTERFACE:		int increaseY()	
+--
+--		RETURNS:		yPos - 20
+--
+--		NOTES:
+--		Increases the global variable y by 20 then returns it decremented by 20 to the calling thread.
+----------------------------------------------------------------------------------------------------------------------*/
+int increaseY(){
+	yPos += 20;
+	return yPos - 20;
+}
+/*------------------------------------------------------------------------------------------------------------------
+--		FUNCTION:		openConnection
+--		DATE:			October 10, 2013
+--		REVISIONS:		n/a
+--		DESIGNER:		Ramzi Chennafi and Ian Davidson
+--		PROGRAMMER:		Ramzi Chennafi and Ian Davidson
+--
+--		INTERFACE:		void openConnection(HWND hwnd, HMENU menuHnd)	
+--
+--		RETURNS:		Nothing
+--
+--		NOTES:
+--		Establishes a connection to the RFID reader by calling the Skyetek API. Creates a new thread to perform reads
+--		and writes.
+----------------------------------------------------------------------------------------------------------------------*/
+void openConnection(HWND hwnd, HMENU menuHnd){
+	HDC		hdc		 = GetDC(hwnd);
+	DWORD	threadId;
+
+	TextOut(hdc, 0, increaseY(), TEXT("Discovering Devices..."), 21);
+	
+	if(!activePort){
+		if((numDevices = SkyeTek_DiscoverDevices(&devices)) > 0)
+		{
+			if((numReaders = SkyeTek_DiscoverReaders(devices,numDevices,&readers)) > 0 )
+			{
+				TextOut(hdc, 0, increaseY(), TEXT("Discovered Reader"), 17);
+				activePort = true;
+				EnableMenuItem(menuHnd, IDM_CONNECT, MF_DISABLED);
+				EnableMenuItem(menuHnd, IDM_DISCONNECT, MF_ENABLED);
+				DrawMenuBar(hwnd);
+				readThrd = CreateThread(NULL, 0, execRead, readers[0], 0, &threadId);
+
+			}
+			else{
+				TextOut(hdc, 0, increaseY(), TEXT("Failed to Discover Reader"), 25);
+			}
+		}
+		else {
+			TextOut(hdc, 0, increaseY(), TEXT("Failed to Discover Devices"), 26);
+		}
+	}
+	ReleaseDC(hwnd, hdc);
+}
+/*------------------------------------------------------------------------------------------------------------------
 --		FUNCTION:		execRead
 --		DATE:			October 10, 2013
 --		REVISIONS:		n/a
@@ -185,11 +218,10 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 --		RETURNS:		DWORD, 0 on thread exit
 --
 --		NOTES:
---		Reads tag data from the reader and presents it on the client screen.
+--		Requests and reads tag data at 2 second intervals from the reader and presents it on the client screen.
 ----------------------------------------------------------------------------------------------------------------------*/
 DWORD WINAPI execRead(LPVOID reader){
 
-	SKYETEK_STATUS		st;
 	SKYETEK_STATUS		status;
 	LPSKYETEK_STRING	str;
 	SKYETEK_ADDRESS		addr;
@@ -204,8 +236,7 @@ DWORD WINAPI execRead(LPVOID reader){
 	SkyeTek_CreateTag(ISO_18000_6C_AUTO_DETECT, NULL, &lpTag);
 	
 	HDC hdc = GetDC(mainHWND);
-	TextOut(hdc, 0, yPos, TEXT("RFID Tag IDs"), 5);
-	yPos += 20;
+	TextOut(hdc, 0, increaseY(), TEXT("RFID Tag IDs"), 5);
 	ReleaseDC(mainHWND, hdc);
 
 	while(activePort){
@@ -214,16 +245,14 @@ DWORD WINAPI execRead(LPVOID reader){
 		{
 			HDC hdc = GetDC(mainHWND);
 			str = SkyeTek_GetStringFromData(lpData);
-			TextOut(hdc, 0, yPos, str, 24);
-			yPos += 20;
+			TextOut(hdc, 0, increaseY(), str, 24);
 			ReleaseDC(mainHWND, hdc);
-			Sleep(5000);
+			Sleep(2000);
 		}		
 	}
 
 	ExitThread(0);
 }
-
 /*------------------------------------------------------------------------------------------------------------------
 --		FUNCTION:		endRead
 --		DATE:			October 10, 2013
@@ -251,4 +280,5 @@ void endRead(HWND hwnd, int numReaders, int numDevices, HMENU menuHnd){
 	
 	SkyeTek_FreeReaders(readers, numReaders);
 	SkyeTek_FreeDevices(devices, numDevices);
+	yPos = 0;
 }
