@@ -1,16 +1,9 @@
-
-#include "mainwindow.h"
-#include <QApplication>
-
+#include "top.h"
 struct gps_data_t* gps_data_ptr = malloc(sizeof(struct gps_data_t));
 //Will perform main functions, including open stream, start new thread, and cleanup
 //Built in QT for if we choose to do a GUI
 int main(int argc, char *argv[])
 {
-    QApplication a(argc, argv);
-    MainWindow w;
-    w.show();
-
     //open data stream
     if(!(openStream())){
         //print failure
