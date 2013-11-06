@@ -1,17 +1,15 @@
 #include "top.h"
-
+#include <gps.h>
 //Will read data from stream. Passed a stream pointer.
-void read_data(void *ptr){
-    gps_data_t *gpsdata = (gps_data_t)ptr;
+void read_data(gps_data_t* gps_data){
 
-
-    while(){
-        if(!gps_waiting(gps_ptr, 500000)){
+    while(1){
+        if(!gps_waiting(gps_data, 500000)){
             Cleanup(GPS_TIMEOUT);
         }
         else{
             errno = 0;
-            if(gps_read(gpsdata) == -1){
+            if(gps_read(gps_data) == -1){
                 //print failure
                 Cleanup(errno == 0 ? GPS_GONE : GPS_ERROR);
             }
@@ -25,6 +23,6 @@ void read_data(void *ptr){
 }
 
 //Will check if recieved data is valid
-bool check_errors(){
+bool check_errors(gps_data_t* gps_data){
     return true;
 }

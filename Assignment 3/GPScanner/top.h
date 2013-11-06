@@ -1,12 +1,7 @@
 #ifndef TOP_H
 #define TOP_H
 #include <iostream>
-#include "gps-utils.cpp"
-#include "gpsrint.cpp"
-#include "main.cpp"
-#include <QTextStream>
 #include <gps.h>
-#include <pthread.h>
 #include <stdlib.h>
 #define MAXCHANNELS 72
 #define MAX_POSSIBLE_SATS (MAXCHANNELS - 2)
@@ -19,5 +14,13 @@ struct fixsource_t
     char *port;
     char *device;
 };
+
+void freeData(gps_data_t*);
+int openStream(gps_data_t*);
+void read_data(gps_data_t*);
+bool check_errors(gps_data_t*);
+void print_data(gps_data_t*);
+
+
 
 #endif // TOP_H
