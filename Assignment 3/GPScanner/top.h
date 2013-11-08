@@ -3,6 +3,8 @@
 #include <iostream>
 #include <gps.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 #define MAXCHANNELS 72
 #define MAX_POSSIBLE_SATS (MAXCHANNELS - 2)
 using namespace std;
@@ -14,7 +16,7 @@ struct fixsource_t
     char *port;
     char *device;
 };
-
+	
 void freeData(gps_data_t*);
 int openStream(gps_data_t*);
 void read_data(gps_data_t*);

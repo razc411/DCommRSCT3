@@ -5,18 +5,16 @@ void read_data(gps_data_t* gps_data){
 
     while(1){
         if(!gps_waiting(gps_data, 500000)){
-            Cleanup(GPS_TIMEOUT);
+            break;
         }
         else{
-            errno = 0;
-            if(gps_read(gps_data) == -1){
-                //print failure
-                Cleanup(errno == 0 ? GPS_GONE : GPS_ERROR);
+            if(int i = gps_read(gps_data) == -1){
+                break;
             }
             else{
-                if(check_errors(gps_data)){
-                    print_data(gps_data);
-                }
+                cout << i << endl;
+                print_data(gps_data);
+                break;
             }
         }
     }

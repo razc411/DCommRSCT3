@@ -1,5 +1,5 @@
 
-CC=g++ -Wall -W -pedantic -cstd=c++11 
+CC=g++ -Wall -W -pedantic -std=c++11 
 CLIB=-lgps
 
 dcgps: dcgps.o gps-utils.o gpsprint.o
@@ -9,7 +9,8 @@ clean:
 	rm -f *.o core.* dcgps
 dcgps.o: dcgps.cpp
 	$(CC) -c dcgps.cpp
-gpsutils.o: gpsutils.cpp
+gps-utils.o: gps-utils.cpp
 	$(CC) -c gps-utils.cpp
 gpsprint.o: gpsprint.cpp
 	$(CC) -c gpsprint.cpp
+	
