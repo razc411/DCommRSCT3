@@ -1,20 +1,23 @@
 #include "top.h"
 #include <gps.h>
-//Will read data from stream. Passed a stream pointer.
 void read_data(gps_data_t* gps_data){
 
+    int i = 0;
+
     while(1){
+        sleep(2);
         if(!gps_waiting(gps_data, 500000)){
+            //deal with error (check_errors)
             break;
         }
         else{
-            if(int i = gps_read(gps_data) == -1){
+            if((i = gps_read(gps_data)) == -1){
+                //deal with error (check_errors)
                 break;
             }
             else{
-                cout << i << endl;
-                print_data(gps_data);
-                break;
+                if(gps_data->set & PACKET_SET)
+                    print_data(gps_data);   
             }
         }
     }

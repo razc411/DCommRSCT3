@@ -1,5 +1,5 @@
 
-CC=g++ -Wall -W -pedantic -std=c++11 
+CC=g++ -Wall -W -pedantic	
 CLIB=-lgps
 
 dcgps: dcgps.o gps-utils.o gpsprint.o
