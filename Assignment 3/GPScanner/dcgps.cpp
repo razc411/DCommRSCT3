@@ -26,7 +26,7 @@ int openStream(gps_data_t *gps_data_ptr){
 
     if((i = gps_open(source.server, source.port, gps_data_ptr)) == -1){
         //print failure 
-        return 0;
+        return 0; 
     }
 
     if(source.device == NULL){
