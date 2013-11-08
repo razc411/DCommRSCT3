@@ -21,7 +21,6 @@ struct fixsource_t
 void freeData(gps_data_t*);
 int openStream(gps_data_t*);
 void read_data(gps_data_t*);
-bool check_errors(gps_data_t*);
 void print_data(gps_data_t*);
 
 

@@ -7,12 +7,12 @@ void read_data(gps_data_t* gps_data){
     while(1){
         sleep(2);
         if(!gps_waiting(gps_data, 500000)){
-            //deal with error (check_errors)
+            cout << "GPS WAITING Timeout" << endl;
             break;
         }
         else{
             if((i = gps_read(gps_data)) == -1){
-                //deal with error (check_errors)
+                cerr << "gps_read(gps_data) : failed to read" << endl;
                 break;
             }
             else{
@@ -21,9 +21,4 @@ void read_data(gps_data_t* gps_data){
             }
         }
     }
-}
-
-//Will check if recieved data is valid
-bool check_errors(gps_data_t* gps_data){
-    return true;
 }

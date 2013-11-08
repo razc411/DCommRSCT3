@@ -6,26 +6,26 @@ int main()
     gps_data_t *gps_data_ptr = (gps_data_t*)malloc(sizeof(struct gps_data_t));
 
     if(!openStream(gps_data_ptr)){
-        //deal with errors
+        cout << "Failed to open the gps stream. Check if the device is connected." << endl;
         exit(0);               
     }
     //open data stream
-    read_data(gps_data_ptr);    
+    read_data(gps_data_ptr);
+    freeData(gps_data_ptr);    
 }
 
-//Will open a gps data stream
+//open a gps data stream
 int openStream(gps_data_t *gps_data_ptr){
     
     static struct fixsource_t source;
 
     source.server = "localhost";
     source.port = DEFAULT_GPSD_PORT;
-    source.device = NULL;
+    source.device = NULL;   
     
     unsigned int flags = WATCH_ENABLE;
 
     if(gps_open(source.server, source.port, gps_data_ptr) == -1){
-        //print failure 
         return 0; 
     }
 
@@ -40,7 +40,7 @@ int openStream(gps_data_t *gps_data_ptr){
 
 //Will clean up data structures when completed
 void freeData(gps_data_t *gps_data_ptr){
-    //gps_close(gps_data_ptr, WATCH_DISABLE, NULL);
+    gps_stream(gps_data_ptr, WATCH_DISABLE, NULL);
     gps_close(gps_data_ptr);
 
 }
